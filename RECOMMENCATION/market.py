@@ -9,7 +9,9 @@ from string import printable
 global energy_price
 global NUM_HOUSES
 global full_sim
-external_event = False
+global internal_event
+global external_event 
+lock = threading.Lock()
 
 def newPrice(current_temp, everybody_connected) :
 
@@ -19,15 +21,28 @@ def newPrice(current_temp, everybody_connected) :
     atenuation_coeff = 0.99
     modulating_coeff_int = 0.001
     modulating_coeff_ext = 0.01
+    modulating_coeff_buy = 0.2
+    modulating_coeff_sell = 0.1
 
     global energy_price
-    energy_price = 0
+    energy_price = 10
+    global internal_event
+    internal_event = False
+    global external_event
+    external_event = False
 
     while current_temp.value != 10000 :
         if (external_event) :
-            energy_price = atenuation_coeff*energy_price + modulating_coeff_int*current_temp.value + modulating_coeff_ext
+            if internal_event :
+                energy_price = atenuation_coeff*energy_price + modulating_coeff_int*current_temp.value + modulating_coeff_ext + modulating_coeff_buy
+            else :
+                energy_price = atenuation_coeff*energy_price + modulating_coeff_int*current_temp.value + modulating_coeff_ext - modulating_coeff_sell
         else :
-            energy_price = atenuation_coeff*energy_price + modulating_coeff_int*current_temp.value
+            if internal_event :
+                energy_price = atenuation_coeff*energy_price + modulating_coeff_int*current_temp.value + modulating_coeff_buy
+            else : 
+                energy_price = atenuation_coeff*energy_price + modulating_coeff_int*current_temp.value - modulating_coeff_sell
+        energy_price = 0.1 if energy_price < 0.1 else energy_price
         print(f"The price of the energy is : <{round(energy_price, 4)} €> right now")
         time.sleep(1)
 
@@ -44,12 +59,12 @@ def handler (sig, frame) :
         external_event = True
     elif sig == signal.SIGUSR1 : 
         print(" ")
-        print("PUTIN WAR HAPPPENING")
+        print("PUTIN INVADES UKRAINE (again)")
         print(" ")
         external_event = True
     elif sig == signal.SIGUSR2 : 
         print(" ")
-        print("FUEL SHORTAGE HAPPENENING")
+        print("FUEL SHORTAGE HAPPENING")
         print(" ")
         external_event = True
 
@@ -100,6 +115,8 @@ def socket_creation(current_temp, everybody_connected) :
 
 def home_interaction(client_socket, address, current_temp) :
     #with client_socket: 
+    global internal_event
+
     trade_policy = client_socket.recv(1024)
     client_policy = int.from_bytes(trade_policy, "big")
     print(f"*************** Connected to client : {address}. Client's policy is number : {client_policy} **********************")
@@ -114,11 +131,15 @@ def home_interaction(client_socket, address, current_temp) :
         client_request = ''.join(char for char in client_request if char in printable)
         
         if client_request == "BUY" : 
-            if full_sim == True : 
-                print("FROM MARKET : someone just bought me energy")
+            #if full_sim == True : 
+            print("FROM MARKET : someone just bought me energy")
+            with lock : 
+                internal_event = True
         elif client_request == "SELL" : 
-            if full_sim == True : 
-                print("FROM MARKET : someone just sold me energy")
+            #if full_sim == True : 
+            print("FROM MARKET : someone just sold me energy")
+            with lock :
+                internal_event = False
     print("Disconnecting from client: ", address) 
     client_socket.close()
 

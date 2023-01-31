@@ -3,7 +3,7 @@ from market import *
 from weather import * 
 from home import *
 
-NUM_HOUSES = 5
+NUM_HOUSES = 10
 TIME_MAX = 240
 
 def handler (sig, frame) : 
