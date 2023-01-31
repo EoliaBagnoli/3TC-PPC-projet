@@ -6,27 +6,52 @@ import socket
 import struct
 from string import printable
 
-energy_price = 0
+global energy_price
 global NUM_HOUSES
+global full_sim
+external_event = False
+
+def newPrice(current_temp, everybody_connected) :
+
+    while everybody_connected.value != True : 
+        time.sleep(0.1)
+
+    atenuation_coeff = 0.99
+    modulating_coeff_int = 0.001
+    modulating_coeff_ext = 0.01
+
+    global energy_price
+    energy_price = 0
+
+    while current_temp.value != 10000 :
+        if (external_event) :
+            energy_price = atenuation_coeff*energy_price + modulating_coeff_int*current_temp.value + modulating_coeff_ext
+        else :
+            energy_price = atenuation_coeff*energy_price + modulating_coeff_int*current_temp.value
+        print(f"The price of the energy is : <{round(energy_price, 4)} €> right now")
+        time.sleep(1)
 
 def handler (sig, frame) : 
 
-    global end_of_communication
     global socket_pid
     global external_pid
+    global external_event
 
     if sig == signal.SIGCHLD : 
         print(" ")
         print("HURRICANE HAPPENING")
         print(" ")
+        external_event = True
     elif sig == signal.SIGUSR1 : 
         print(" ")
         print("PUTIN WAR HAPPPENING")
         print(" ")
+        external_event = True
     elif sig == signal.SIGUSR2 : 
         print(" ")
         print("FUEL SHORTAGE HAPPENENING")
         print(" ")
+        external_event = True
 
     # here : to make sure that every process is killed 
     elif sig == signal.SIGINT : 
@@ -78,6 +103,7 @@ def home_interaction(client_socket, address, current_temp) :
     trade_policy = client_socket.recv(1024)
     client_policy = int.from_bytes(trade_policy, "big")
     print(f"*************** Connected to client : {address}. Client's policy is number : {client_policy} **********************")
+
     while current_temp.value != 10000 :
         data = client_socket.recv(1024)
         client_request = data.decode()
@@ -88,16 +114,20 @@ def home_interaction(client_socket, address, current_temp) :
         client_request = ''.join(char for char in client_request if char in printable)
         
         if client_request == "BUY" : 
-            print("FROM MARKET : someone just bought me energy")
+            if full_sim == True : 
+                print("FROM MARKET : someone just bought me energy")
         elif client_request == "SELL" : 
-            print("FROM MARKET : someone just sold me energy")
+            if full_sim == True : 
+                print("FROM MARKET : someone just sold me energy")
     print("Disconnecting from client: ", address) 
     client_socket.close()
 
-def market(current_temp, number_of_houses, everybody_connected) :
+def market(current_temp, number_of_houses, everybody_connected, full_simulation) :
 
     global NUM_HOUSES
+    global full_sim
     NUM_HOUSES = number_of_houses
+    full_sim = full_simulation
 
     #print("Market function")
     #print(f"Market PID : {multiprocessing.current_process().pid}")
@@ -114,11 +144,7 @@ def market(current_temp, number_of_houses, everybody_connected) :
     tcp_socket = threading.Thread(target=(socket_creation), args=(current_temp, everybody_connected,))
     tcp_socket.start()
 
+    newPrice(current_temp, everybody_connected)
+
     ext.join()
     tcp_socket.join()
-
-    """ #maintenant on s'occupe juste de calculer l'energie : 
-    while True : 
-        time.sleep(1)
-        print(f"The price of the energy is : <{energy_price} €> right now")
-        energy_price += 1 """
