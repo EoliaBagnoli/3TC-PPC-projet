@@ -5,7 +5,7 @@ _VOINCHET Léna, BAGNOLI Eolia_
 
 &rarr; Pour lançer la simulation : exécuter le main (python3 main.py) 
 
-<span style="text-decoration: underline">Variables modifiables pour changer les @param de la simulation : </span>
+<ins>Variables modifiables pour changer les @param de la simulation : </ins>
 
 Dans main.py : 
 - NUM_HOUSES = nombre de maisons
