@@ -3,7 +3,7 @@
 ## **SIMULATION D'UN MARCHE D'ENERGIE :**
 _VOINCHET Léna, BAGNOLI Eolia_
 
-** &rarr; Pour lançer la simulation : exécuter le main (python3 main.py) **
+**&rarr; Pour lançer la simulation : exécuter le main (python3 main.py) **
 
 
 <ins>Variables modifiables pour changer les @param de la simulation : </ins>
