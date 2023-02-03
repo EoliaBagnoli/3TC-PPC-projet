@@ -1,32 +1,89 @@
+import multiprocessing
+import threading
+from external import *
+import signal
 import socket
 import struct
-from threading import Thread
-import time
-import signal
-import multiprocessing
-#from external import *
+from string import printable
 
-energy_price = 0
-MAX_CONN = 10
-Y = 0.1512
-energy_price_t_1 = 0
+global energy_price
+global NUM_HOUSES
+global full_sim
+global internal_event
+global external_event 
+lock = threading.Lock()
 
-def handler(sig, frame) :
-    if sig == signal.SIGINT : 
-        print("THERE IS A HURRICANE HELP")
+def newPrice(current_temp, everybody_connected) :
+
+    while everybody_connected.value != True : 
+        time.sleep(0.1)
+
+    atenuation_coeff = 0.99
+    modulating_coeff_int = 0.001
+    modulating_coeff_ext = 0.01
+    modulating_coeff_buy = 0.2
+    modulating_coeff_sell = 0.1
+
+    global energy_price
+    energy_price = 10
+    global internal_event
+    internal_event = False
+    global external_event
+    external_event = False
+
+    while current_temp.value != 10000 :
+        if (external_event) :
+            if internal_event :
+                energy_price = atenuation_coeff*energy_price + modulating_coeff_int*current_temp.value + modulating_coeff_ext + modulating_coeff_buy
+            else :
+                energy_price = atenuation_coeff*energy_price + modulating_coeff_int*current_temp.value + modulating_coeff_ext - modulating_coeff_sell
+        else :
+            if internal_event :
+                energy_price = atenuation_coeff*energy_price + modulating_coeff_int*current_temp.value + modulating_coeff_buy
+            else : 
+                energy_price = atenuation_coeff*energy_price + modulating_coeff_int*current_temp.value - modulating_coeff_sell
+        energy_price = 0.1 if energy_price < 0.1 else energy_price
+        print(f"The price of the energy is : <{round(energy_price, 4)} €> right now")
+        time.sleep(1)
+
+def handler (sig, frame) : 
+
+    global socket_pid
+    global external_pid
+    global external_event
+
+    if sig == signal.SIGCHLD : 
+        print(" ")
+        print("HURRICANE HAPPENING")
+        print(" ")
+        external_event = True
     elif sig == signal.SIGUSR1 : 
-        print("DAMN, AGAIN ??")
+        print(" ")
+        print("PUTIN INVADES UKRAINE (again)")
+        print(" ")
+        external_event = True
     elif sig == signal.SIGUSR2 : 
-        print("FUEL SHORTAGE")
-    elif sig == signal.SIGKILL : 
-        print("F*****G BUTTERFLIES")
+        print(" ")
+        print("FUEL SHORTAGE HAPPENING")
+        print(" ")
+        external_event = True
 
-def energy_price_calcul() : 
-    energy_price = energy_price_t_1 * Y
-    return energy_price
+    # here : to make sure that every process is killed 
+    elif sig == signal.SIGINT : 
+        print(" ")
+        print(" ")
+        print("KILLING ALL THE PROCESSES :")
+        print(" ")
+        print(" ")
+        active = multiprocessing.active_children()
+        for child in active:
+            print(f"killing : {child}")
+            child.kill()
+        os.kill(multiprocessing.parent_process().pid, signal.SIGINT)
+        os.kill(multiprocessing.current_process().pid, signal.SIGKILL)
 
-def socket_creation(current_temp) : 
-    print("Creating the socket")
+def socket_creation(current_temp, everybody_connected) : 
+
     HOST = "localhost"
     PORT = 1313
 
@@ -36,43 +93,73 @@ def socket_creation(current_temp) :
         server_socket.listen(1)
         server_socket.setsockopt(
             socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
-        while number_of_connections <= MAX_CONN :
-            #print("waiting for a connection")
+
+        sockets = [threading.Thread for i in range(NUM_HOUSES)]
+
+        while number_of_connections < NUM_HOUSES :
             client_socket, address = server_socket.accept()
             client_socket.setsockopt(
                 socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
-            t = Thread(target = home_interaction, args =(client_socket, address,current_temp,))
-            t.start()
+            sockets[number_of_connections] = threading.Thread(target = home_interaction, args =(client_socket, address, current_temp,))
+            sockets[number_of_connections].start()
             number_of_connections +=1
+        
+        everybody_connected.value = True
 
+
+        for h in sockets :
+            h.join()
 
 def home_interaction(client_socket, address, current_temp) :
-    with client_socket: 
-        print("Connected to client: ", address)
-        trade_policy = client_socket.recv(1024)
-        client_policy = int.from_bytes(trade_policy, "big")
-        print("Client's policy is number : " + str(client_policy))
-        #print("la température vaut : " + str(current_temp.value))
+    global internal_event
+
+    trade_policy = client_socket.recv(1024)
+    client_policy = int.from_bytes(trade_policy, "big")
+    print(f"*************** Connected to client : {address}. Client's policy is number : {client_policy} **********************")
+
+    while current_temp.value != 10000 :
         data = client_socket.recv(1024)
         client_request = data.decode()
-        while data != "STOP":
-            data = client_socket.recv(1024)
-            client_request = data.decode()
-            signal.signal(signal.SIGINT, handler)
-            #print(f"le message est {client_request}")
-            if(client_request == "BUY") : 
-                print("ok la moula")
+        client_request = str(client_request)
+        # on enlève les espaces indésirables
+        client_request = client_request.strip()
+        # on enlève les char spéciaux
+        client_request = ''.join(char for char in client_request if char in printable)
         
-        print("Disconnecting from client: ", address) 
+        if client_request == "BUY" : 
+            if full_sim == True : 
+                print("FROM MARKET : someone just bought me energy")
+            with lock : 
+                internal_event = True
+        elif client_request == "SELL" : 
+            if full_sim == True : 
+                print("FROM MARKET : someone just sold me energy")
+            with lock :
+                internal_event = False
+    print("Disconnecting from client: ", address) 
+    client_socket.close()
 
+def market(current_temp, number_of_houses, everybody_connected, full_simulation) :
 
-def market(current_temp) : 
-    
-    #print(current_temp.value)
-    print(energy_price_calcul())
-    socket_creation(current_temp)
+    global NUM_HOUSES
+    global full_sim
+    NUM_HOUSES = number_of_houses
+    full_sim = full_simulation
 
+    signal.signal(signal.SIGCHLD, handler)
+    signal.signal(signal.SIGUSR1, handler)
+    signal.signal(signal.SIGUSR2, handler)
+    signal.signal(signal.SIGINT, handler)
 
-#external = multiprocessing.Process(target = external, args = (multiprocessing.current_process().pid,))
-#external.start()
-market(20)
+    pid = multiprocessing.current_process().pid
+
+    ext = multiprocessing.Process(target=(external), args=(pid, current_temp, everybody_connected,))
+    ext.start()
+
+    tcp_socket = threading.Thread(target=(socket_creation), args=(current_temp, everybody_connected,))
+    tcp_socket.start()
+
+    newPrice(current_temp, everybody_connected)
+
+    ext.join()
+    tcp_socket.join()

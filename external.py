@@ -1,29 +1,34 @@
-import signal
-import random
+#******************************* La fonction external crée un des évenements proposés aléatoirement à des intevalles de temps aléatoires. 
+
 import time
+import signal
+import os
+import random
 
-def external (pid_market) :
-    while True :
-        print("What is happening to the Market ?")
-        #evenement = input()
-        frequency = 1
-        evenement = random.randint(1, 4)
-        time.sleep(frequency)
 
-        if evenement == 1 :
-            print("HURRICANE")
-            signal.kill(pid_market, signal.sigint)
-        elif evenement == 2 : 
-            print("PUTIN MAKES A WAR")
-            signal.kill(pid_market, signal.sigusr1)
-        elif evenement == 3 : 
-            print("FUEL SHORTAGE")
-            signal.kill(pid_market, signal.sigusr2)
-        elif evenement == 4 : 
-            print("BUTTERFLY EFFECT")
-            signal.kill(pid_market, signal.sigkill)
+def external(pid_market, current_temp, everybody_connected) : 
+
+    #waits for everything to get in place before starting
+    while everybody_connected.value != True : 
+        time.sleep(0.1)
+
+    while current_temp.value != 10000 :
+
+        time.sleep(random.randint(2, 15))
+        evenement = random.randint(1, 61)
+        if (evenement >= 1) and (evenement <= 20) :
+            # correspond to HURRICANE
+            os.kill(pid_market, signal.SIGCHLD)
+        elif (evenement >= 21) and (evenement <= 40) : 
+            # correspond to PUTIN MAKES A WAR
+            os.kill(pid_market, signal.SIGUSR1)
+        elif (evenement >= 41) and (evenement <= 60) : 
+            ## correspond to FUEL SHORTAGE
+            os.kill(pid_market, signal.SIGUSR2)
+        elif evenement == 61 : 
+            print(" ")
+            print(" ")
+            print("**************************** APOCALYPSE. EVERYBODY IS DEAD. *****************************")
+            os.kill(pid_market, signal.SIGINT)
         else : 
             print("L'evenement que vous avez demandé n'existe pas")
-
-pid_market = 8321
-external(pid_market)
