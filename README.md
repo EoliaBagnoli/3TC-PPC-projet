@@ -1,10 +1,11 @@
 # 3TC-PPC-projet
 
-SIMULATION D'UN MARCHE D'ENERGIE : 
+## **SIMULATION D'UN MARCHE D'ENERGIE :**
+_VOINCHET Léna, BAGNOLI Eolia_
 
---> Pour lançer la simulation : exécuter le main (python3 main.py) 
+&rarr Pour lançer la simulation : exécuter le main (python3 main.py) 
 
-Variables modifiables pour changer les @param de la simulation : 
+<span style="text-decoration: underline">Variables modifiables pour changer les @param de la simulation : </span>
 
 Dans main.py : 
 - NUM_HOUSES = nombre de maisons
